@@ -1,4 +1,5 @@
 #include "RtpSender.h"
+#include <random>
 
 #define MAX_RTP_PKT_LENGTH 1100
 #define SEND_LENGTH        1150
@@ -52,20 +53,29 @@ void CRTPSender::OnRTCPCompoundPacket(RTCPCompoundPacket *pack, const RTPTime &r
     }
 }
 
+uint32_t generateSSRC() {
+    // 使用随机数生成器生成随机的 32 位无符号整数作为 SSRC
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution <uint32_t> dis(0, UINT32_MAX);
+    return dis(gen);
+}
+
 bool
 CRTPSender::initParam(JavaVM *vm, JNIEnv *env, CRTPSender *sess, const char *host,
                       uint16_t PORT_BASE,
-                      uint16_t DST_PORT, jobject listener,uint16_t _framerate) {
+                      uint16_t DST_PORT, jobject listener, uint16_t _framerate) {
     logd("CRTPSender init jni!\n");
     if (s_init) {
         loge("CRTPReceiver already init. \n");
         return false;
     }
+    //有时会报错JNI DETECTED ERROR IN APPLICATION: use of deleted global reference 0xbf2eee3a
     if (s_jobj == NULL) {
         s_jobj = env->NewGlobalRef(listener);
     }
-    if (_framerate){
-       mFrameRate = _framerate;
+    if (_framerate) {
+        mFrameRate = _framerate;
     }
     s_env = env;
     s_callback = new SendCallback(env, s_jobj);
@@ -81,10 +91,11 @@ CRTPSender::initParam(JavaVM *vm, JNIEnv *env, CRTPSender *sess, const char *hos
         return false;
     }
     /* set h264 param */
-    sessparams.SetUsePredefinedSSRC(true);  //设置使用预先定义的SSRC
+    sessparams.SetUsePredefinedSSRC(false);  //设置使用预先定义的SSRC
     sessparams.SetOwnTimestampUnit(1.0 / 90000.0); /* 设置采样间隔 */
     sessparams.SetAcceptOwnPackets(false);   //接收自己发送的数据包
-    sessparams.SetPredefinedSSRC(SSRC);     //定义SSRC
+    uint32_t ssrc = generateSSRC();
+    sessparams.SetPredefinedSSRC(ssrc);     //定义SSRC
 
     transparams.SetPortbase(PORT_BASE);
 
@@ -238,7 +249,7 @@ bool CRTPSender::SendH264Nalu(unsigned char *m_h264Buf, int buflen, bool isSpsOr
                 fu_hdr->TYPE = (char) (pSendbuf[0] & 0x1f);
                 memcpy(sendbuf + 2, &pSendbuf[t * MAX_RTP_PKT_LENGTH + 1], MAX_RTP_PKT_LENGTH);
                 status = this->SendPacket((void *) sendbuf, MAX_RTP_PKT_LENGTH + 2, H264, false, 0);
-                if(!CheckError(status)) {
+                if (!CheckError(status)) {
                     return false;
                 }
                 t++;
@@ -257,7 +268,7 @@ bool CRTPSender::SendH264Nalu(unsigned char *m_h264Buf, int buflen, bool isSpsOr
                 fu_hdr->TYPE = (char) (pSendbuf[0] & 0x1f);
                 memcpy(sendbuf + 2, &pSendbuf[t * MAX_RTP_PKT_LENGTH + 1], MAX_RTP_PKT_LENGTH);
                 status = this->SendPacket((void *) sendbuf, MAX_RTP_PKT_LENGTH + 2, H264, false, 0);
-                if(!CheckError(status)) {
+                if (!CheckError(status)) {
                     return false;
                 }
                 t++;
@@ -285,11 +296,11 @@ bool CRTPSender::SendH264Nalu(unsigned char *m_h264Buf, int buflen, bool isSpsOr
                 memcpy(sendbuf + 2, &pSendbuf[t * MAX_RTP_PKT_LENGTH + 1], iSendLen - 1);
 //                最后一个参数，根据90000/帧率 得出，现在设置的是30帧率的
                 int pts = 3000;
-                if (mFrameRate > 0){
+                if (mFrameRate > 0) {
                     pts = 90000 / mFrameRate;
                 }
                 status = this->SendPacket((void *) sendbuf, iSendLen - 1 + 2, H264, true, pts);
-                if(!CheckError(status)) {
+                if (!CheckError(status)) {
                     return false;
                 }
                 t++;
@@ -312,7 +323,7 @@ bool CRTPSender::SendRtpData(unsigned char *m_rtpBuf, int buflen, bool isMarker,
     if (isMarker) {
         this->SetDefaultMark(true);
         int pts = 3000;
-        if (mFrameRate > 0){
+        if (mFrameRate > 0) {
             pts = 90000 / mFrameRate;
         }
         this->SetDefaultTimestampIncrement(pts);//设置时间戳增加间隔
@@ -335,7 +346,7 @@ void CRTPSender::SetParamsForSendingH264() {
     this->SetDefaultMark(true);        //设置位
     this->SetTimestampUnit(1.0 / 90000.0); //设置采样间隔
     int pts = 3000;
-    if (mFrameRate > 0){
+    if (mFrameRate > 0) {
         pts = 90000 / mFrameRate;
     }
     this->SetDefaultTimestampIncrement(pts);//设置时间戳增加间隔
