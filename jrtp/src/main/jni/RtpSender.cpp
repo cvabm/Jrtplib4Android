@@ -215,15 +215,17 @@ bool CRTPSender::SendH264Nalu(unsigned char *m_h264Buf, int buflen, bool isSpsOr
     }
     if (buflen <= MAX_RTP_PKT_LENGTH) {
         this->SetDefaultMark(true);
-        //设置NALU HEADER,并将这个HEADER填入sendbuf[0]
-        nalu_hdr = (NALU_HEADER *) &sendbuf[0]; //将sendbuf[0]的地址赋给nalu_hdr，之后对nalu_hdr的写入就将写入sendbuf中；
-        nalu_hdr->F = (char) (pSendbuf[0] & 0x80);
-        nalu_hdr->NRI = (char) ((pSendbuf[0] & 0x60)
-                >> 5);//有效数据在n->nal_reference_idc的第6，7位，需要右移5位才能将其值赋给nalu_hdr->NRI。
-        nalu_hdr->TYPE = (char) (pSendbuf[0] & 0x1f);
-        //NALU头已经写到sendbuf[0]中，接下来则存放的是NAL的第一个字节之后的数据。所以从r的第二个字节开始复制
-        memcpy(sendbuf + 1, pSendbuf, buflen);
-        status = this->SendPacket((void *) sendbuf, buflen);
+
+        // 设置 NALU 头部
+        nalu_hdr = (NALU_HEADER*)sendbuf;
+        nalu_hdr->F = (pSendbuf[0] & 0x80) >> 7;
+        nalu_hdr->NRI = (pSendbuf[0] & 0x60) >> 5;
+        nalu_hdr->TYPE = pSendbuf[0] & 0x1F;
+        // 复制有效数据
+        memcpy(sendbuf + sizeof(NALU_HEADER), pSendbuf + 1, buflen - 1);
+
+        // 发送数据包
+        status = this->SendPacket((void*)sendbuf, buflen);
         return CheckError(status);
     } else if (buflen >= MAX_RTP_PKT_LENGTH) {
         this->SetDefaultMark(false);
