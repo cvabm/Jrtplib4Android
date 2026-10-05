@@ -1,4 +1,18 @@
 # Jrtplib4Android
+
+## APK releases
+
+Run **Build and publish release APK** from the GitHub Actions page, or push a
+`v*` tag matching `versionName` in `app/build.gradle` (for example, `v1.0`).
+The workflow builds the main `app` example and publishes a signed
+`Jrtplib4Android-v<version>.apk` with its SHA-256 checksum to GitHub Releases.
+It uses the existing `armeabi-v7a` JNI libraries in `app/src/main/jniLibs`.
+Builds use JDK 11, Gradle 7.3.3, Android SDK 28, and NDK 23.1.7779620.
+
+Signing uses repository secrets: `ANDROID_KEYSTORE_BASE64`,
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`.
+Keep the same signing key for future versions so installed apps can be updated.
+
 基于开源项目jrtplib，自主编译出jni依赖库，在Android平台上实现RTP/RTCP数据接收、发送等示例。（包含H264数据分包发送，添加时间水印等）
 
 注意：本人采用的是android-ndk-r14b，并不是as自带的。！！！（自带的会出现各种异常）
